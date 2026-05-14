@@ -4,7 +4,7 @@
 **Severity**: HIGH
 **Created**: 2026-05-13
 **Implemented**: —
-**Depends on**: WP5
+**Depends on**: WP2, WP3
 
 ---
 

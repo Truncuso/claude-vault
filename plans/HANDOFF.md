@@ -11,7 +11,7 @@
 
 ## Current State Summary
 
-Full SDD plan written with 6 work packages, verification matrix (50+ tests), and architectural decisions documented. Three-layer access model (QMD for search, mcpvault for CRUD, Obsidian CLI for live ops) chosen after evaluating all options. Implementation has NOT started — this is a pure planning artifact ready for execution.
+Full SDD plan written with 6 work packages, verification matrix (50+ tests), and architectural decisions documented. Three-layer access model (QMD for search, mcpvault for CRUD, Obsidian CLI for live ops) chosen after evaluating all options. Implementation has NOT started beyond plugin scaffolding (manifest, hooks spec, monitors spec, settings). No scripts, skills, or executable code exist yet. This is a planning artifact with structural skeleton ready for implementation.
 
 **Key architectural decisions made:**
 - mcpvault (`@bitbonsai/mcpvault`) as primary CRUD path — MCP-native, no custom bridge
@@ -126,13 +126,16 @@ Full SDD plan written with 6 work packages, verification matrix (50+ tests), and
 
 ### Potential Gotchas
 
-- **inotify watch limit**: Large vaults may exceed `fs.inotify.max_user_watches` (default 8192). Document `sudo sysctl fs.inotify.max_user_watches=524288` in SETUP.md
-- **QMD daemon port conflict**: If port 8181 is in use, QMD daemon fails silently. The `qmd-daemon.sh ensure` script checks before starting.
-- **mcpvault npx cold start**: First invocation downloads packages, takes 10-30s. Subsequent calls use npx cache.
+- **inotify watch limit**: Large vaults may exceed `fs.inotify.max_user_watches` (default 8192). Monitor with `cat /proc/sys/fs/inotify/max_user_watches`. Document `sudo sysctl fs.inotify.max_user_watches=524288` in SETUP.md. Also exclude `.obsidian/`, `.git/`, `.trash/` directories from file watching.
+- **QMD daemon port conflict**: If port 8181 is in use, QMD daemon fails. Hooks use `|| true` guards and 10s timeout to prevent session startup blocking.
+- **mcpvault npx cold start**: First invocation downloads packages, takes 10-30s. Subsequent calls use npx cache. Fails completely in air-gapped environments.
+- **mcpvault @latest risk**: `npx @bitbonsai/mcpvault@latest` fetches newest version on every first invocation. Pin to a specific version (e.g., `@1.x.x`) in production to avoid supply-chain risk on a tool with full vault CRUD access.
 - **obsidian-local-rest-api SSL cert**: Self-signed cert causes verification errors. If used as fallback, Python bridge needs `verify=False`
 - **smolagents → LangChain migration**: Keep existing extraction services (they're framework-agnostic). Only refactor the orchestration layer.
 - **Backward compat with Templater templates**: The templates call Python via `exec`. If CLI interface changes, old templates break. Add new entrypoints alongside old ones, don't modify old ones.
 - **Git-tracked `.claude/`**: The dotfiles repo at `/home/christoph/dotfiles/claude/` is symlinked to `~/.claude/claude`. Changes to skills/agents/rules/ need to be committed there.
+- **QMD index staleness after mcpvault writes**: mcpvault writes hit filesystem directly; QMD index lags up to 30s (FileChanged debounce). An agent that writes via mcpvault then immediately searches via QMD will miss its own write. No write-through protocol exists — document as known limitation.
+- **`qmd status` output format**: The Stop hook parses `qmd status --json` output. If this flag or format changes in a future QMD version, the hook fails gracefully via `|| true`.
 
 ---
 

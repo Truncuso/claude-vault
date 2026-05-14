@@ -144,7 +144,7 @@ Workflow (`workflows/routing.md`): source type detection → model selection →
 ### Skill updates: sync-claude-sessions
 
 - Replace hardcoded vault paths with `${OBSIDIAN_ACTIVE_VAULT}`
-- Add post-export QMD re-index: `qmd update --collection sessions && qmd embed --collection sessions`
+- Add post-export QMD re-index: `qmd update && qmd embed` (both commands are global — no --collection flag exists)
 - Add frontmatter validation against schema (existing `schema/tags.yaml`)
 
 ### Slash commands
@@ -176,6 +176,7 @@ Workflow (`workflows/routing.md`): source type detection → model selection →
 | T7 | ingest-content routes PDF correctly | PDF pipeline called | Provide PDF path, verify orchestrator invoked |
 | T8 | recall works with env vars (no hardcoded paths) | Search succeeds, paths from env | Invoke recall after WP1 |
 | T9 | sync-claude-sessions triggers QMD re-index | sessions collection updated after export | Export session, check qmd status |
+| T10 | All 5 slash commands registered | Commands appear in help/list | `/help` or check commands/ directory |
 
 ---
 

@@ -1,10 +1,6 @@
 {
   "qmd-daemon-health": {
-    "command": "while true; do curl -sf localhost:${QMD_DAEMON_PORT:-8181}/health > /dev/null; sleep 30; done",
-    "description": "Health-check QMD daemon every 30s"
-  },
-  "vault-md-watcher": {
-    "command": "inotifywait -m -r --format '%w%f' -e modify,create,delete,move \"${OBSIDIAN_ACTIVE_VAULT}\" --include '\\.md$' | while read f; do sleep 30; qmd update; done",
-    "description": "Watch active vault for markdown changes, trigger QMD re-index (debounced 30s)"
+    "command": "while true; do curl -sf localhost:${QMD_DAEMON_PORT:-8181}/health > /dev/null 2>&1; sleep 30; done",
+    "description": "Health-check QMD daemon every 30s. FileChanged hook handles md re-indexing — this monitor is health-only."
   }
 }

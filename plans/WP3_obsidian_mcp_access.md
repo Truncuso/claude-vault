@@ -98,8 +98,9 @@ Verify mcpvault can write a note and read it back:
 | T2 | mcpvault write_note creates file visible in Obsidian | File appears in Obsidian file explorer | Create test note, check Obsidian UI |
 | T3 | mcpvault get_frontmatter parses YAML | Returns structured frontmatter | Read note with known frontmatter |
 | T4 | mcpvault search_notes finds content | BM25-ranked results | Search for known content |
-| T5 | obsidian-cli handles Obsidian not running gracefully | Error JSON, not crash | Run with Obsidian closed |
-| T6 | obsidian-cli create uses template | Template variables resolved | Create from template, inspect output |
+| T5 | mcpvault patch_note preserves other content | Only specified changes applied, body unchanged | Patch frontmatter, verify body unchanged |
+| T6 | obsidian-cli handles Obsidian not running gracefully | Error JSON, not crash | Run with Obsidian closed |
+| T7 | obsidian-cli create uses template | Template variables resolved | Create from template, inspect output |
 
 ---
 

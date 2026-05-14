@@ -1,12 +1,14 @@
 {
   "SessionStart": [
     {
-      "command": "qmd-daemon ensure",
-      "description": "Ensure QMD HTTP daemon is running on port ${QMD_DAEMON_PORT}"
+      "command": "qmd-daemon ensure || true",
+      "timeout": 10000,
+      "description": "Ensure QMD HTTP daemon is running on port ${QMD_DAEMON_PORT}. Non-blocking on failure."
     },
     {
-      "command": "vault info",
-      "description": "Print active vault summary for session context"
+      "command": "vault info || true",
+      "timeout": 5000,
+      "description": "Print active vault summary for session context. Non-blocking on failure."
     }
   ],
   "FileChanged": [
@@ -20,13 +22,14 @@
   ],
   "PostCompact": [
     {
-      "command": "qmd-daemon status",
-      "description": "Verify QMD daemon health after context compaction"
+      "command": "qmd-daemon status || true",
+      "timeout": 5000,
+      "description": "Verify QMD daemon health after context compaction. Non-blocking on failure."
     }
   ],
   "Stop": [
     {
-      "command": "qmd status --json | python -c \"import sys,json; d=json.load(sys.stdin); print(f'Index freshness: {d.get(\\\"document_count\\\",0)} docs')\"",
+      "command": "qmd status --json 2>/dev/null | python3 -c \"import sys,json; d=json.load(sys.stdin); print(f'QMD: {d.get(\\\"document_count\\\",0)} docs indexed')\" || true",
       "description": "Report QMD index freshness on session end"
     }
   ]

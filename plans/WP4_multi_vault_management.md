@@ -33,6 +33,7 @@ Only one vault exists (`Obsidian_Work_Vault`). No mechanism to create new vaults
 | 3 | Create `~/.claude/scripts/vault/test-vault.sh` | pending |
 | 4 | Create test vault at `${VAULTS_BASE}/Obsidian_Test_Vault/` | pending |
 | 5 | Register in vault-registry.json, add QMD collection, add mcpvault config | pending |
+| 6 | Add `--delete` flag to create-vault.sh for vault removal | pending |
 
 ---
 
@@ -71,7 +72,7 @@ vault create <name> [--from-template <path>]
 # 3. cd ${VAULTS_BASE}/Obsidian_<Name> && git init
 # 4. Register in vault-registry.json
 # 5. qmd collection add <name>-vault ${VAULTS_BASE}/Obsidian_<Name> --mask "**/*.md"
-# 6. qmd update --collection <name>-vault && qmd embed --collection <name>-vault
+# 6. qmd update && qmd embed  (NOTE: both commands are GLOBAL — no --collection flag exists)
 # 7. Add mcpvault MCP config entry
 
 # Output contract:
@@ -93,6 +94,25 @@ Validates vault creation:
 ### Step 4-5 — Create test vault
 
 Execute `vault create test` and verify all integration points.
+
+### Step 6 — Vault delete
+
+```bash
+vault delete <name> [--force]
+
+# Procedure:
+# 1. Confirm vault exists in registry
+# 2. Dry-run: list what will be removed (directory, registry entry, QMD collection, mcpvault config)
+# 3. Require --force flag to proceed
+# 4. qmd collection drop <name>-vault
+# 5. Remove from vault-registry.json
+# 6. Remove mcpvault MCP config entry
+# 7. rm -rf ${VAULTS_BASE}/Obsidian_<Name>/
+
+# Output contract:
+{"deleted": true, "name": "test", "path_removed": "...",
+ "qmd_collection_dropped": "test-vault", "registry_updated": true}
+```
 
 ---
 

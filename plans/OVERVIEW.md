@@ -80,35 +80,134 @@ WP2 and WP3 are parallelizable (no mutual dependencies). WP4 depends on WP2 (vau
 
 ## Reference Sources
 
-All resources, documentation, repos, and blog posts referenced during planning. These are the canonical external sources for this project.
+All resources, documentation, repos, and blog posts referenced during planning. These are the canonical external sources for this project. Each entry includes exploration notes.
 
-### Core Tools
+---
 
-| Source | URL | Role |
-|--------|-----|------|
-| QMD GitHub | [https://github.com/tobi/qmd](https://github.com/tobi/qmd) | QMD — local markdown semantic search engine (BM25 FTS5 + vector via sqlite-vec + node-llama-cpp) |
-| QMD plugin marketplace | `~/.claude/plugins/marketplaces/qmd/` | QMD Claude Code plugin (v0.9.0), MCP server via HTTP daemon |
-| QMD CLAUDE.md | `~/.claude/plugins/marketplaces/qmd/CLAUDE.md` | QMD's own agent instructions — contains prohibition on auto-running commands |
-| mcpvault | [https://github.com/bitbonsai/mcpvault](https://github.com/bitbonsai/mcpvault) | MCP-native Obsidian vault CRUD (`npx @bitbonsai/mcpvault`), 14 tools, headless |
-| mcp-obsidian (evaluated, not chosen) | [https://github.com/MarkusPfundstein/mcp-obsidian](https://github.com/MarkusPfundstein/mcp-obsidian) | Alternative MCP server for Obsidian — evaluated, mcpvault preferred |
-| Obsidian CLI docs | [https://obsidian.md/cli](https://obsidian.md/cli) | Obsidian CLI reference (search, create, daily:append, read, eval) |
+### Core Tools (Primary Dependencies)
+
+| Source | URL | Role | Notes |
+|--------|-----|------|-------|
+| **QMD** | [github.com/tobi/qmd](https://github.com/tobi/qmd) | Local markdown search engine (BM25 FTS5 + vector via sqlite-vec + node-llama-cpp). Built by Tobias Lutke (Shopify CEO). | v0.9.0. Three search modes: `search` (~30ms BM25), `vector_search` (~2s semantic), `deep_search` (~10s hybrid). `qmd update` and `qmd embed` are GLOBAL — no per-collection scoping. |
+| **QMD CLAUDE.md** | `~/.claude/plugins/marketplaces/qmd/CLAUDE.md` | QMD's own agent instructions. | Agent-level prohibition: AI must never auto-run `qmd collection add`, `qmd embed`, or `qmd update`. User-configured systemd/cron/inotify watchers are fine — the user consciously set them up. |
+| **mcpvault** | [github.com/bitbonsai/mcpvault](https://github.com/bitbonsai/mcpvault) | MCP-native Obsidian vault CRUD via `npx @bitbonsai/mcpvault`. 14 tools: read/write/patch/delete/move/search notes, frontmatter, tags, directory listing. Headless (no Obsidian needed). | One vault per instance — multi-vault requires multiple MCP server entries. Token-optimized output. |
+| **mcp-obsidian** (evaluated, not chosen) | [github.com/MarkusPfundstein/mcp-obsidian](https://github.com/MarkusPfundstein/mcp-obsidian) | Alternative MCP server for Obsidian. | Evaluated but rejected — mcpvault is MCP-native, requires no bridge code, and works without Obsidian running. |
+| **Obsidian CLI** | [obsidian.md/cli](https://obsidian.md/cli) | CLI for running Obsidian instance. Subcommands: `open`, `search`, `create`, `daily`, `daily:append`, `read`, `eval`. | Requires Obsidian app running. Benchmark: 54x faster than grep for orphan notes, 6x faster for vault search. Output via `--json` flag. |
+
+---
 
 ### Claude Code Plugin Documentation
 
-| Source | URL | Role |
-|--------|-----|------|
-| Claude Code Plugins | [https://code.claude.com/docs/en/plugins](https://code.claude.com/docs/en/plugins) | Plugin system: manifest, skills, hooks, monitors, bin/ |
-| Claude Code Hooks Guide | [https://code.claude.com/docs/en/hooks-guide](https://code.claude.com/docs/en/hooks-guide) | Lifecycle hooks: SessionStart, FileChanged, PostCompact, Stop |
-| Claude Code Monitoring | [https://code.claude.com/docs/en/monitoring-usage](https://code.claude.com/docs/en/monitoring-usage) | Background monitors, usage tracking |
+| Source | URL | Role | Notes |
+|--------|-----|------|-------|
+| **Claude Code Plugins** | [code.claude.com/docs/en/plugins](https://code.claude.com/docs/en/plugins) | Plugin system reference: `.claude-plugin/plugin.json` manifest, `skills/`, `hooks/`, `monitors/`, `bin/`, `settings.json`. | Plugin name becomes namespace for slash commands (e.g., `/qmd-obsidian:search`). |
+| **Hooks Guide** | [code.claude.com/docs/en/hooks-guide](https://code.claude.com/docs/en/hooks-guide) | Lifecycle hooks: SessionStart, FileChanged, PostCompact, Stop, SessionEnd. | Key pattern: SessionStart for daemon ensure + vault injection, FileChanged for async qmd update on .md changes. |
+| **Monitoring Usage** | [code.claude.com/docs/en/monitoring-usage](https://code.claude.com/docs/en/monitoring-usage) | Background monitors for health checks and file watching. | Persistent monitors defined in `monitors/monitors.json`. |
 
-### Inspiration & Prior Art
+---
 
-| Source | URL/Path | Role |
-|--------|----------|------|
-| Artem Zhutov blog post | [https://x.com/ArtemXTech/status/2028330693659332615](https://x.com/ArtemXTech/status/2028330693659332615) | Inspiration: personal OS skills, recall, sync-claude-sessions workflow |
-| personal-os-skills | `/media/christoph/Samsung_Evo990/Projects/00_AI/00_Workflows/personal-os-skills/` | Source repo for `recall` and `sync-claude-sessions` skills — 7 skills total |
-| agentic_note_ingestion (draft) | `Obsidian_Work_Vault/System/000_Scripts/agentic_note_ingestion/` | Existing Python ingestion project (smolagents → LangChain migration target) |
-| Obsidian Work Vault | `/media/christoph/M2.SSD1/000_Vaults/Obsidian_Work_Vault/` | Primary vault — 26 plugins, Templater templates, structured folders |
+### Blog Posts & Articles
+
+| Source | URL | Author/Date | Key Insights |
+|--------|-----|-------------|--------------|
+| **"Grep Is Dead: How I Made Claude Code Actually Remember Things"** | [artemxtech.substack.com](https://artemxtech.substack.com/p/grep-is-dead-how-i-made-claude-code) | Artem Zhutov, 2026-03-02 | Core problem: 700 sessions in 3 weeks, zero cross-session memory. Solution stack: QMD + `/recall` skill + Obsidian vault. Three recall modes: temporal (reconstruct sessions from a day), topic (BM25 across collections), graph (visualization). Key metric: semantic search finds 4/5 relevant results that don't contain the search words. Philosophy: "Tools change. If you have your context you can make it work in any situation." |
+| **"Obsidian + Claude Code Integration Guide"** | [blog.starmorph.com](https://blog.starmorph.com/blog/obsidian-claude-code-integration-guide) | Kevin Lee / StarMorph | Five integration strategies ranked. QMD + session sync stack achieves "60%+ token reduction vs grep/glob." Obsidian CLI v1.12: 54x faster for orphan notes. Core principle: "Agents read, humans write" — AI output in `~/.claude/`, authentic thinking in vault. |
+| **"Claude Code Doesn't Index Your Codebase"** | [vadim.blog](https://vadim.blog/claude-code-no-indexing) | Vadim, 2026-03 | Confirms Claude Code uses Glob → Grep → Read → Explore agent hierarchy (NOT indexing). Boris Cherny (Claude Code creator): early RAG versions abandoned — "agentic search outperformed it by a lot." 92% prefix caching reuse. QMD fills the indexing gap that Claude Code intentionally left open. |
+
+---
+
+### Reference Repos (Explored & Analyzed)
+
+#### claude-obsidian (Truncuso/claude-obsidian)
+
+| | |
+|---|---|
+| **Path** | `/media/christoph/Samsung_Evo990/Projects/00_AI/00_Workflows/claude-obsidian/` |
+| **URL** | [github.com/Truncuso/claude-obsidian](https://github.com/Truncuso/claude-obsidian) |
+| **What it does** | Claude Code plugin building persistent, compounding Obsidian wiki vaults — drop sources, AI extracts entities/concepts, cross-references everything. |
+| **Skills** (11 total) | `wiki` (orchestrator), `wiki-ingest` (8-15 pages per source), `wiki-query` (3 depths), `wiki-lint` (10-category health check), `wiki-fold` (log rollup), `save` (conversation → wiki note), `autoresearch` (3-round web loop), `canvas` (.canvas JSON), `defuddle` (strip web clutter), `obsidian-markdown` (reference), `obsidian-bases` (reference) |
+
+**Key patterns to adapt for qmd-obsidian:**
+
+| Pattern | Description | WP Relevance |
+|---------|-------------|--------------|
+| **Hot cache** (`wiki/hot.md`) | ~500-word summary of recent context, rewritten on every operation. SessionStart restores it silently, PostCompact re-loads after compaction. Solves "what were we doing?" across sessions. | WP5 (vault-search skill) — warm context injection on session start |
+| **Three-layer content architecture** | `.raw/` (immutable sources) + `wiki/` (AI-generated) + schema files (CLAUDE.md, WIKI.md) as instruction layer. Clean separation of human vs. AI content. | WP6 (ingestion pipeline output) — separate raw extracts from structured notes |
+| **Dry-run/commit split** | Destructive ops default to stdout dry-run. Commit mode requires explicit user confirmation. Prevents auto-commit hooks from firing on experimental output. | WP4 (vault delete — dry-run first, commit with --force) |
+| **Delta tracking via manifest** | `.raw/.manifest.json` stores source hashes, prevents re-ingestion of unchanged sources. | WP6 (source adapter — skip already-ingested content) |
+| **Feature detection for extensions** | Runtime checks for script/file presence with graceful fallback. No hard dependencies. | WP3 (check Obsidian CLI availability, fall back to mcpvault) |
+| **Exit-code protocol** | Scripts use distinct exit codes (0=ok, 2=usage, 3=cache corrupt, 10=service unreachable, 11=model missing). Skills read exit codes explicitly. | WP6 (CLI error handling, JSON contracts) |
+| **Deterministic fold IDs** | Filenames from input ranges (not timestamps) — structural idempotency. Same inputs → same filename → duplicate detection. | WP6 (ingestion idempotency) |
+
+---
+
+#### avoid-ai-writing (conorbronsdon/avoid-ai-writing)
+
+| | |
+|---|---|
+| **Path** | `/media/christoph/Samsung_Evo990/Projects/00_AI/00_Workflows/avoid-ai-writing/` |
+| **URL** | [github.com/conorbronsdon/avoid-ai-writing](https://github.com/conorbronsdon/avoid-ai-writing) |
+| **What it does** | Portable single-file AI writing audit-and-rewrite skill (v3.3.1). Two modes: rewrite (audit + remove AI-isms) and detect (flag only). |
+
+**Key patterns:**
+
+| Pattern | Description | WP Relevance |
+|---------|-------------|--------------|
+| **36 pattern categories across 5 groups** | Content (significance inflation, notability name-dropping), Language (109-entry word table, 3 tiers, adapted from brandonwise/humanizer), Structure (em dashes, uniform paragraph length), Communication (chatbot artifacts, sycophantic tone), Meta (rhythm/uniformity as #1 signal per Pangram Labs research). | WP6 (evaluator — add AI-writing detection as quality dimension) |
+| **6 context profiles with tolerance matrix** | `blog`, `technical-blog`, `linkedin`, `docs`, `casual`, `default`. Per-rule tolerance: strict/relaxed/skip/extra-strict. | WP6 (prompt registry — context-aware output quality) |
+| **Rewrite-vs-patch threshold** | Quantitative gate: 5+ vocabulary flags + 3+ pattern categories + uniform rhythm = full rewrite. Otherwise surgical edit. | WP6 (evaluator — structured pass/fail/needs_review decisions) |
+| **Integration idea** | Run ingested AI-generated notes through detect mode as post-processing gate. Flag AI-isms before they enter vault. Tag notes for review. | WP6 (post-generation quality filter) |
+
+---
+
+#### obsidian-skills (kepano/obsidian-skills)
+
+| | |
+|---|---|
+| **Path** | `/media/christoph/Samsung_Evo990/Projects/00_AI/00_Workflows/obsidian-skills/` |
+| **URL** | [github.com/kepano/obsidian-skills](https://github.com/kepano/obsidian-skills) |
+| **What it does** | Collection of Agent Skills (agentskills.io spec) teaching AI agents how to interact with Obsidian vaults. |
+| **Skills** (5 total) | `obsidian-markdown` (wikilinks, callouts, embeds, frontmatter), `obsidian-bases` (.base files, YAML views), `json-canvas` (.canvas spec), `obsidian-cli` (CLI wrapper), `defuddle` (web content extraction). |
+
+**Key patterns:**
+
+| Pattern | Description | WP Relevance |
+|---------|-------------|--------------|
+| **Validation-at-end workflow** | Every skill forces a verify/validate step after mutation. Applies to markdown, bases, canvas. | WP5 (skills — validate output after note creation) |
+| **Three interaction modes documented** | Filesystem (direct I/O, no Obsidian needed), CLI (running Obsidian process), external tools (defuddle, no vault required). No MCP used — pure Agent Skills markdown spec. | WP3 (document interaction mode clearly per tool) |
+| **Offloaded reference files** (`references/`) | Dense reference material (callout types, function reference, examples) in separate files. SKILL.md stays lean and action-oriented. | WP5 (skill structure — keep SKILL.md lean, reference material in sub-files) |
+| **Concrete examples inline** | Every concept has embedded YAML/JSON/bash/markdown examples. Troubleshooting sections for common errors. | WP5 (skill writing — include concrete examples) |
+
+---
+
+#### Auto-claude-code-research-in-sleep (ARIS)
+
+| | |
+|---|---|
+| **Path** | `/media/christoph/Samsung_Evo990/Projects/00_AI/00_Workflows/Auto-claude-code-research-in-sleep/` |
+| **URL** | [github.com/wanshuiyin/Auto-claude-code-research-in-sleep](https://github.com/wanshuiyin/Auto-claude-code-research-in-sleep) |
+| **What it does** | Composable Markdown-skill framework orchestrating full ML research lifecycle: idea discovery → adversarial cross-model review → compiled PDF. Runs as autonomous overnight agent pipeline. |
+
+**Key patterns:**
+
+| Pattern | Description | WP Relevance |
+|---------|-------------|--------------|
+| **Artifact contracts between stages** | Skills communicate exclusively through named plain-text files (IDEA_REPORT.md, EXPERIMENT_LOG.md, NARRATIVE_REPORT.md) — never in-chat summaries. Reviewer-independence: pass file paths only. | WP6 (CLI JSON contracts between pipeline stages) |
+| **Adversarial review loop** | Up to 4 rounds, external LLM from DIFFERENT model family scores work and demands fixes. Converges at score >= 6/10 or rounds exhausted. | WP6 (evaluator — cross-model review for quality) |
+| **Research-wiki skill** | Maintains persistent knowledge base with 4 entity types (papers, ideas, experiments, claims) as individual .md files with structured YAML frontmatter. Typed relationship graph in `graph/edges.jsonl` with 8 edge types. `query_pack.md` is hard-budgeted 8000-char compressed summary. | WP5 (vault-search — structured entity pages with typed edges)
+| **Integration contract** | Formalizes 6 required components per cross-skill integration: activation predicate, canonical helper, concrete artifact, visible checklist, repair command, verifier. | WP6 (pipeline — formal integration contracts between stages) |
+| **Effort levels** | `lite`/`balanced`/`max`/`beast` scaling token usage parametrically. | WP5 (vault-search — quick/standard/deep modes mapping to QMD search modes) |
+
+---
+
+### Prior Art: personal-os-skills
+
+| | |
+|---|---|
+| **Path** | `/media/christoph/Samsung_Evo990/Projects/00_AI/00_Workflows/personal-os-skills/` |
+| **Relevance** | Source for `recall` and `sync-claude-sessions` skills to be adapted in WP5. 7 skills total from Artem Zhutov. |
+
+---
 
 ### Plugin Target
 
@@ -116,7 +215,27 @@ All resources, documentation, repos, and blog posts referenced during planning. 
 |------|-------|
 | Plugin repo | `Truncuso/qmd-obsidian` |
 | Local path | `/media/christoph/Samsung_Evo990/Projects/00_AI/00_Workflows/qmd-obsidian/` |
-| GitHub | SSH: `git@github.com:Truncuso/qmd-obsidian.git` |
+| GitHub | [github.com/Truncuso/qmd-obsidian](https://github.com/Truncuso/qmd-obsidian) |
+
+---
+
+## Key Design Insights from Reference Exploration
+
+These patterns discovered during exploration should inform implementation:
+
+1. **Hot cache pattern** (from claude-obsidian) — WP5 vault-search should maintain a `hot.md` of recent vault context, restored on SessionStart, refreshed on PostCompact. This bridges the session-memory gap without scanning the full vault.
+
+2. **Artifact contracts** (from ARIS) — WP6 ingestion stages should pass data through named JSON files, not in-chat. Enables independent testing of each stage, cross-model review, and deterministic replay.
+
+3. **AI-writing quality gate** (from avoid-ai-writing) — WP6 evaluator should include AI-pattern detection as a quality dimension. Ingestion output that smells like AI gets flagged for human review before vault entry.
+
+4. **Validation-at-end** (from obsidian-skills) — Every WP5 skill must end with a verify/validate step. Created notes checked for valid frontmatter, wikilinks checked for dead targets, search results checked for relevance.
+
+5. **Deterministic idempotency** (from claude-obsidian) — WP6 source adapter should generate deterministic IDs from content hashes, not timestamps. Same input → same output path → skip re-ingestion.
+
+6. **Graceful fallback chains** (from claude-obsidian feature detection) — WP3 access layer: try QMD search first, fall back to mcpvault search_notes if QMD down, fall back to Obsidian CLI search if Obsidian is running, error gracefully if all unavailable.
+
+7. **Integration contracts** (from ARIS) — WP6 pipeline stages need formal contracts: what each stage consumes, what it produces, its activation predicate, its verifier, and its repair command.
 
 ---
 

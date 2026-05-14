@@ -163,6 +163,7 @@ User-scoped systemd services:
 | T3 | MCP get tool retrieves document | Returns full content | `mcp__plugin_qmd_qmd__get` with known file path |
 | T4 | Context descriptions improve relevance | Scoped search returns domain-relevant results | Compare scoped vs. unscoped search relevance |
 | T5 | Daemon survives SessionStart re-invoke | Idempotent — no duplicate process | Call `qmd-daemon.sh ensure` twice, check single process |
+| T6 | systemd service is active and enabled | `active (running)`, `enabled` | `systemctl --user is-active qmd-daemon`, `systemctl --user is-enabled qmd-daemon` |
 
 ---
 
