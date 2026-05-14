@@ -1,0 +1,7 @@
+{
+  "agent": "${HOME}/.claude/agents/qmd-obsidian/**/*.md",
+  "subagentStatusLine": {
+    "type": "plugin",
+    "path": "qmd-obsidian"
+  }
+}

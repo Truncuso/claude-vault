@@ -1,0 +1,11 @@
+{
+  "name": "qmd-obsidian",
+  "version": "0.1.0",
+  "description": "QMD semantic search + Obsidian vault management for Claude Code. Multi-vault CRUD via mcpvault, QMD-powered search (BM25 + vector), agentic content ingestion with LangChain/LlamaIndex.",
+  "author": "Christoph Unger",
+  "license": "MIT",
+  "dependencies": {
+    "qmd": ">=0.9.0"
+  },
+  "keywords": ["obsidian", "qmd", "vault", "search", "knowledge-base", "ingestion"]
+}

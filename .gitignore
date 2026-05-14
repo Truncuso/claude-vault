@@ -1,0 +1,26 @@
+# Workstation-specific config (contains API keys, local paths)
+config/config.env
+
+# Obsidian workspace state
+*.workspace.json
+.obsidian/workspace*.json
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+*.egg-info/
+
+# Node
+node_modules/
+
+# QMD
+.qmd/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
