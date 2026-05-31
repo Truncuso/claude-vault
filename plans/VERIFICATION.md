@@ -1,162 +1,171 @@
-# Verification Matrix — QMD + Obsidian Vault Integration
+# Verification Matrix — claude-vault
 
-**Date**: 2026-05-13
+**Date**: 2026-05-14
 
 ---
 
 ## Build Verification Gates (All WPs)
 
-Every work package must pass these gates before being considered complete:
-
 | Gate | Command | Expected |
 |------|---------|----------|
-| Shell syntax | `for f in ~/.claude/scripts/**/*.sh; do bash -n "$f"; done` | No errors on all .sh files |
-| Python syntax | `python -m compileall ~/.claude/scripts/` | No syntax errors |
-| JSON validity | `for f in ~/.claude/**/*.json; do python -m json.tool "$f" > /dev/null; done` | All JSON valid |
+| Shell syntax | `for f in .claude/scripts/**/*.sh; do bash -n "$f"; done` | No errors |
+| Python syntax | `python -m compileall .claude/scripts/` | No syntax errors |
+| JSON validity | `for f in .claude/**/*.json; do python -m json.tool "$f" > /dev/null; done` | All JSON valid |
+| YAML validity | `for f in .claude/prompts/**/*.yaml; do python -c "import yaml; yaml.safe_load(open('$f'))"; done` | All YAML valid |
 
 ---
 
 ## Static Guardrails
 
-Architecture invariants enforced by grep-based checks:
-
 | Invariant | Check | Applies To |
 |-----------|-------|------------|
-| No hardcoded `/home/` paths | `grep -r '/home/' ~/.claude/scripts/` (exclude config.env) | All scripts |
-| No hardcoded `/media/` paths | `grep -r '/media/' ~/.claude/scripts/` (exclude config.env) | All scripts |
-| Env vars used for vault paths | `grep -r 'OBSIDIAN_.*VAULT\|VAULTS_BASE' ~/.claude/scripts/` | All scripts |
-| MCP configs reference env vars | `${...}` pattern in mcp-servers.json | All MCP configs |
+| No hardcoded absolute paths | `grep -rn '/home/\|/media/' .claude/scripts/` (exclude config.env) | All scripts |
+| Vault-relative paths used | Paths resolve from `$VAULT_ROOT` | All scripts |
+| MCP configs reference env vars | `${VAR}` pattern in settings.json | All MCP configs |
 
 ---
 
-## WP1: Foundation — Environment & Path Conventions
+## WP0: Repository Setup
 
-| ID | Test | Expected Result | Method |
-|----|------|-----------------|--------|
-| V0.1 | No hardcoded `/home/` or `/media/` in scripts | 0 grep hits (exclude config.env) | `grep -r '/home/\|/media/' ~/.claude/scripts/` |
-| V0.2 | env.sh is idempotent | No duplicate env vars | Source twice, diff `env` output |
-| V0.3 | Vault paths resolve correctly | All paths in registry exist | `vault list`, `test -d` each path |
-| W1-T1 | config.env syntax valid | No errors | `bash -n ~/.claude/config.env` |
-| W1-T2 | vault list returns valid JSON | Valid JSON, active field, vaults array | `vault list \| python -m json.tool` |
-| W1-T3 | vault switch updates OBSIDIAN_ACTIVE_VAULT | Env var changes, previous value logged | Source env.sh, vault switch, echo $OBSIDIAN_ACTIVE_VAULT |
-| W1-T4 | settings.json has no /home/cunger/ | 0 hits | `grep '/home/cunger' ~/.claude/settings.json` |
-| W1-T5 | hooks.json has no /home/cunger/ | 0 hits | `grep '/home/cunger' ~/.claude/hooks/hooks.json` |
+| ID | Test | Expected | Method |
+|----|------|----------|--------|
+| V0.1 | Repo URL correct | `Truncuso/claude-vault` | `git remote -v` |
+| V0.2 | plugin.json has correct name | "claude-vault" | Read plugin.json |
+| V0.3 | Stale plans archived | All old WPs in `_archive/` | `ls plans/_archive/` |
+| V0.4 | Setup skill spec complete | Flow documented, 7 phases | Read WP0 |
 
 ---
 
-## WP2: QMD Configuration — Collections, Indexing, Daemon, Auto-Update
+## WP1: Per-Vault QMD Setup
 
-| ID | Test | Expected Result | Method |
-|----|------|-----------------|--------|
-| V1.1 | QMD collections exist with documents | document_count > 0 per collection | `qmd status --json` |
-| V1.2 | QMD daemon responds on port $QMD_DAEMON_PORT | HTTP 200 | `curl -s localhost:${QMD_DAEMON_PORT}/health` |
-| V1.3 | Auto-update triggers on .md file change | `qmd update` runs within 35s of .md change | `touch test.md` in vault, wait 35s, check update log |
-| V1.4 | `qmd embed` works when run manually | Vector count > 0 after embed | Run `qmd embed`, verify `qmd status --json` shows vectors |
-| W2-T1 | BM25 keyword search returns ranked results | Results array with scores | `qmd search "machine learning" --collection work-vault` |
-| W2-T2 | MCP search tool returns results | Non-empty results | `mcp__plugin_qmd_qmd__search` via MCP |
-| W2-T3 | MCP get tool retrieves full document | Content matches file on disk | `mcp__plugin_qmd_qmd__get` with known path |
-| W2-T4 | Context descriptions improve relevance | Scoped search returns domain-relevant results | A/B: scoped vs unscoped search |
-| W2-T5 | systemd service is active | `active (running)` | `systemctl --user is-active qmd-daemon` |
-| W2-T6 | systemd service enabled for reboot | `enabled` | `systemctl --user is-enabled qmd-daemon` |
-| W2-T7 | SessionStart hook idempotent | No duplicate daemon process | Call `qmd-daemon.sh ensure` twice, verify single PID |
+| ID | Test | Expected | Method |
+|----|------|----------|--------|
+| V1.1 | QMD collection exists with documents | document_count > 0 | `qmd status --json` |
+| V1.2 | QMD daemon responds | HTTP 200 | `curl localhost:8181/health` |
+| V1.3 | FileChanged triggers qmd update | Re-index within 35s of .md change | `touch test.md`, wait 35s, check update log |
+| V1.4 | `qmd embed` works manually | Embeddings generated | Run `qmd embed`, verify vector count > 0 |
+| T1.1 | BM25 search returns results | Ranked results | `qmd search "test" --collection <vault>` |
+| T1.2 | MCP search tool functional | Returns MCP results | `mcp__plugin_qmd_qmd__search` |
+| T1.3 | MCP get retrieves document | Full content returned | `mcp__plugin_qmd_qmd__get` |
+| T1.4 | Daemon idempotent | Single process after double ensure | Call ensure twice, verify one PID |
+| T1.5 | systemd service active + enabled | `active (running)`, `enabled` | `systemctl --user is-active/is-enabled qmd-daemon` |
 
 ---
 
-## WP3: Obsidian MCP Access — mcpvault + CLI
+## WP2: MCP Integration
 
-| ID | Test | Expected Result | Method |
-|----|------|-----------------|--------|
-| V2.1 | mcpvault lists 14 tools | All expected tools present | MCP `list_tools` for mcpvault-work |
-| V2.2 | mcpvault read/write roundtrip | Written content = read content | write_note → read_note → compare → delete_note |
-| V2.3 | Obsidian CLI search returns results | Results when Obsidian running | `obsidian-cli search "test" --json` |
-| W3-T1 | mcpvault read_note on existing file | Returns known content | Read known vault file, compare hash |
-| W3-T2 | mcpvault write_note creates file visible in Obsidian | File appears in Obsidian file explorer | Manual: check Obsidian UI after write |
-| W3-T3 | mcpvault get_frontmatter parses YAML | Structured frontmatter dict | Read note with known frontmatter, check fields |
-| W3-T4 | mcpvault search_notes BM25 relevance | Known content ranks high | Search for unique phrase, verify top result |
-| W3-T5 | mcpvault patch_note preserves other content | Only specified changes applied | Patch frontmatter, verify body unchanged |
-| W3-T6 | obsidian-cli handles Obsidian not running | Error JSON, exit code non-zero but no crash | Run `obsidian-cli search "test"` with Obsidian closed |
-| W3-T7 | obsidian-cli create uses template | Template variables resolved in output | Create from template, inspect note content |
-
----
-
-## WP4: Multi-Vault Management
-
-| ID | Test | Expected Result | Method |
-|----|------|-----------------|--------|
-| V3.1 | vault create produces valid vault | All standard folders, .obsidian/, .git/ present | `test -d` for each expected directory |
-| V3.2 | vault switch updates all references | OBSIDIAN_ACTIVE_VAULT + QMD scope change | Switch, verify env var, verify qmd collection |
-| W4-T1 | vault create registers in vault-registry.json | New vault in `vault list` output | Create vault, run `vault list`, grep |
-| W4-T2 | vault create adds QMD collection | Collection exists, doc count > 0 | `qmd status --json` after create |
-| W4-T3 | vault create initializes git repo | .git/ present, initial commit exists | `git -C <vault_path> log --oneline` |
-| W4-T4 | vault create adds mcpvault MCP config | Config entry present in file | grep mcp-servers.json for new entry |
-| W4-T5 | vault create refuses to overwrite | Error on duplicate name | `vault create test` twice, check error on second |
-| W4-T6 | vault delete --force removes cleanly | Directory gone, registry updated, QMD collection dropped | Create temp vault, delete, verify all traces gone |
-| W4-T7 | New vault opens in Obsidian | App recognizes vault | Manual: File → Open Vault → navigate to new dir |
+| ID | Test | Expected | Method |
+|----|------|----------|--------|
+| V2.1 | mcpvault lists 14 tools | All tools present | MCP `list_tools` |
+| V2.2 | mcpvault read/write roundtrip | Written = read content | write → read → compare → delete |
+| V2.3 | Obsidian CLI search returns results | Results when Obsidian running | `obsidian search "test"` |
+| T2.1 | mcpvault read_note on existing file | Returns known content | Read known vault file, compare hash |
+| T2.2 | mcpvault write_note visible in Obsidian | File appears | Create note, check Obsidian UI |
+| T2.3 | mcpvault get_frontmatter parses YAML | Structured frontmatter | Read note with known frontmatter |
+| T2.4 | mcpvault search_notes BM25 | Known content ranks high | Search for unique phrase |
+| T2.5 | mcpvault patch_note preserves other content | Only specified changes applied | Patch frontmatter, verify body unchanged |
+| T2.6 | obsidian-cli handles Obsidian not running | Error JSON, no crash | Run with Obsidian closed |
+| T2.7 | obsidian-cli create uses template | Template vars resolved | Create from template, inspect output |
+| T2.8 | Ollama MCP lists models | `ollama_list` returns models | MCP `ollama_list` |
+| T2.9 | Ollama MCP generates text | `ollama_generate` produces output | MCP `ollama_generate` with test prompt |
 
 ---
 
-## WP5: Skills & Templates
+## WP3: General Skills
 
-| ID | Test | Expected Result | Method |
-|----|------|-----------------|--------|
-| V4.1 | All 5 new skills load without error | SKILL.md parsed, description displayed | Skill invocation for each |
-| V4.2 | vault-search returns synthesized results | QMD search + LLM synthesis from vault | E2E: known query → expected content |
-| W5-T1 | vault-manager routes to vault.sh | Correct subcommand executed | Invoke skill, verify vault.sh called |
-| W5-T2 | vault-search quick mode returns file list | BM25 results ranked by relevance | Search for known unique content |
-| W5-T3 | vault-search deep mode synthesizes multi-doc answer | Combined results from multiple QMD calls | Complex cross-topic query |
-| W5-T4 | obsidian-note creates file via mcpvault | Note visible, content correct | Create, read back via mcpvault |
-| W5-T5 | daily-note appends without overwriting | Both entries present in daily note | Append twice, verify concatenation |
-| W5-T6 | ingest-content routes YouTube URL correctly | YouTube orchestrator invoked | Provide YT URL, verify pipeline log |
-| W5-T7 | ingest-content routes PDF path correctly | PDF orchestrator invoked | Provide PDF path, verify pipeline log |
-| W5-T8 | recall skill works with env vars | Search succeeds, no hardcoded path errors | Invoke recall, verify results from QMD |
-| W5-T9 | sync-claude-sessions triggers QMD re-index | sessions collection doc count increases | Export session, check qmd status |
-| W5-T10 | All 5 slash commands registered | Commands appear in help/list | `/help` or check commands/ directory |
-
----
-
-## WP6: Agentic Ingestion — LangChain/LlamaIndex Migration
-
-| ID | Test | Expected Result | Method |
-|----|------|-----------------|--------|
-| V5.1 | Ingestion produces valid JSON contracts | Schema validation passes | JSON Schema against CLI output |
-| V5.2 | Model discovery returns available models | count > 0, valid fields, sorted by context_length | `discover_models()` call |
-| V5.3 | Evaluator produces numeric scores | All scores 0-1 range, overall in {pass,fail,needs_review} | Test with fixture outputs |
-| V5.4 | Backward compat: old Templater templates work | Existing templates execute, produce notes | Run `YT_Local_Ingestion_v2.md` and `PDF_Agent_Ingestion.md` |
-| W6-T1 | YouTube LangChain pipeline = smolagents quality | Structure compliance comparable or better | A/B on same test video |
-| W6-T2 | PDF pipeline preserves section boundaries | ## headings match PDF structure | Test with known multi-section PDF |
-| W6-T3 | Podcast pipeline: audio → transcript → note | Transcript file created, structured note generated | Test with sample audio file |
-| W6-T4 | Model auto-select falls back gracefully | Uses next-best model if preferred unavailable | Kill Ollama, run ingestion |
-| W6-T5 | Prompt registry loads and renders templates | Variables substituted correctly | Unit test with fixture data |
-| W6-T6 | Source adapter routes by ref type | youtube.com → YouTubeSource, .pdf → PDFSource | Unit test with various refs |
-| W6-T7 | CLI error handling via JSON contract | error_code, message, details in output | Run with invalid/missing source |
-| W6-T8 | Timing info present in CLI output | extraction_ms, generation_ms, total_ms > 0 | Parse output, verify fields |
+| ID | Test | Expected | Method |
+|----|------|----------|--------|
+| V3.1 | All 6 skills load without error | SKILL.md parsed, description displayed | Skill invocation |
+| V3.2 | vault-search returns synthesized results | QMD search + LLM synthesis across ≥2 documents. Query: "what do I know about X?" with known multi-doc answer in vault fixture. | E2E with fixture vault containing 3+ docs on shared topic |
+| T3.1 | vault-search quick mode returns file list | BM25 ranked results with scores | Search for unique phrase from fixture vault |
+| T3.2 | vault-search deep mode synthesizes multi-doc answer | Combined results from ≥3 QMD calls across different collections/paths. Query bridges two domains (e.g., "how does concept-A relate to concept-B"). | Cross-domain query requiring synthesis from multiple documents |
+| T3.3 | obsidian-note creates file via mcpvault | Note visible, content correct | Create, read back |
+| T3.4 | daily-note appends without overwriting | Both entries present | Append twice, verify concatenation |
+| T3.5 | ingest-content routes YouTube correctly | YouTube pipeline invoked | Provide YT URL, verify pipeline log |
+| T3.6 | ingest-content routes PDF correctly | PDF pipeline invoked | Provide PDF path, verify pipeline log |
+| T3.7 | recall works with vault-relative paths | Search succeeds, no hardcoded path errors | Invoke recall |
+| T3.8 | sync-sessions triggers QMD re-index | sessions collection updated | Export session, check qmd status |
+| T3.9 | All slash commands registered | Commands appear in help | `/help` |
 
 ---
 
-## Live / CLI Verification
+## WP4: Working Vault Skills + Templates
+
+| ID | Test | Expected | Method |
+|----|------|----------|--------|
+| V4.1 | All 4 working-vault skills load | SKILL.md parsed | Skill invocation |
+| V4.2 | daily-journal produces structured entry | All sections filled, valid frontmatter | E2E with test prompts |
+| T4.1 | project-tracker extracts project status | Correct status from frontmatter | Run on known project file |
+| T4.2 | quick-capture creates inbox note | Note appears in Inbox/ | Capture test content |
+| T4.3 | meeting-notes generates structured note | Participants, decisions, actions present | Generate from test meeting |
+| T4.4 | All 5 templates installed correctly | Files exist in vault template folder | `test -f` each template |
+| T4.5 | Templates produce valid markdown | Valid frontmatter, correct structure | Render each template |
+| T4.6 | Notes from templates appear in Obsidian | Visible in file explorer | Manual: check Obsidian UI |
+
+---
+
+## WP5: Styles & Anti-Patterns
+
+| ID | Test | Expected | Method |
+|----|------|----------|--------|
+| V5.1 | All 5 style profiles parse as valid YAML | No parse errors | YAML validation |
+| V5.2 | Style detection returns correct profile | Correct for vault type | Test with each vault type |
+| T5.1 | Anti-pattern filter catches known AI-isms | Tier 1 words flagged | Test with AI-generated sample |
+| T5.2 | Style transform applies target voice | Output matches profile | A/B: styled vs unstyled output |
+| T5.3 | P0 flags block note creation | Note not created when credibility killer found | Test with P0-trigger content |
+| T5.4 | Style override via --style flag works | Manual flag takes priority | Test --style flag |
+| T5.5 | Style override via frontmatter works | Frontmatter style: field takes priority | Test with style: casual |
+
+---
+
+## WP6: Agentic Ingestion
+
+| ID | Test | Expected | Method |
+|----|------|----------|--------|
+| V6.1 | Pipelines produce valid JSON contracts | Schema validation passes. Schema at `schemas/ingestion-output.schema.json` defines required fields: status, source, model_used, artifacts[], evaluation, timing. | JSON Schema validation with `check-jsonschema` or `ajv` |
+| V6.2 | Model discovery returns available models | count > 0, valid fields | `discover_models()` |
+| V6.3 | Evaluator produces numeric scores | All 0-1, overall valid enum | Test with fixture outputs |
+| V6.4 | Backward compat: old templates work | Existing Templater templates execute | Run old templates |
+| T6.1 | YouTube pipeline produces structured note | Key takeaways, summary, insights | Full pipeline with test video |
+| T6.2 | PDF pipeline preserves section boundaries | Markdown headings match PDF structure | Test with multi-section PDF |
+| T6.3 | Podcast pipeline transcribes and structures | Transcript + structured note | Test with sample audio |
+| T6.4 | Model auto-select falls back gracefully | Uses next-best if preferred unavailable | Kill Ollama, run ingestion |
+| T6.5 | Prompt registry loads and renders templates | Jinja2 vars resolved | Unit test |
+| T6.6 | Source adapter routes by ref type | youtube.com → YouTubeSource, .pdf → PDFSource | Unit test |
+| T6.7 | CLI error handling via JSON contract | error_code, message, details | Run with invalid source |
+| T6.8 | Timing info in CLI output | extraction_ms, generation_ms, total_ms > 0 | Parse output |
+| T6.9 | Style-aware output respects profile | Output matches target style | Compare casual vs academic from same source |
+| T6.10 | Anti-pattern filter runs on ingestion output | AI-isms flagged in evaluation | Ingest known AI-generated content |
+
+---
+
+## Live / CLI Verification (End-to-End)
 
 | ID | Command / Action | Expected Observation |
 |----|------------------|---------------------|
-| L1 | `source ~/.claude/scripts/lib/env.sh && vault list` | JSON array with work vault (and test/personal if created) |
-| L2 | `bash ~/.claude/scripts/qmd/setup-collections.sh` | Creates collections, runs update + embed, prints document counts |
-| L3 | `systemctl --user start qmd-daemon && curl localhost:8181/health` | HTTP 200 |
-| L4 | Use MCP `mcp__plugin_qmd_qmd__search` with "knowledge graph" | Returns ranked .md files from vault |
-| L5 | Use MCP `mcp__mcpvault-work__write_note` create test note | Note appears in Obsidian |
-| L6 | Open Obsidian, run `/vault-search "machine learning"` | Returns synthesized answer from vault content |
-| L7 | `python -m ingestion.cli.main --source youtube --ref "<test_url>" --evaluate` | Produces structured note with evaluation scores |
-| L8 | `python -m pytest ~/.claude/tests/unit/ -v` | All unit tests pass |
-| L9 | `python -m pytest ~/.claude/tests/integration/ -v` | All integration tests pass (with services running) |
-| L10 | `python -m pytest ~/.claude/tests/e2e/ -v` | All E2E tests pass (full stack) |
+| L1 | Run setup skill in empty vault | 7-phase flow, .claude/ populated, QMD indexed |
+| L2 | `qmd status --json` | Collections listed, document_count > 0 |
+| L3 | `curl localhost:8181/health` | HTTP 200 |
+| L4 | MCP `mcp__plugin_qmd_qmd__search` "test" | Returns ranked .md files from vault |
+| L5 | MCP `mcp__mcpvault-*__write_note` create test note | Note appears in Obsidian |
+| L6 | MCP `mcp__ollama__ollama_list` | Returns installed Ollama models |
+| L7 | `/vault-search "machine learning"` | Returns synthesized answer from vault |
+| L8 | `/ingest-content <youtube-url> --style professional` | Produces style-formatted structured note |
+| L9 | `python -m pytest .claude/tests/unit/ -v` | All unit tests pass |
+| L10 | `python -m pytest .claude/tests/integration/ -v` | All integration tests pass |
 
 ---
 
 ## Verification Status
 
-| WP | Shell Syntax | JSON Validity | Specific Tests | Live/CLI | Review | Overall |
-|----|-------------|---------------|----------------|----------|--------|---------|
-| WP1 | — | — | — | — | — | specified |
-| WP2 | — | — | — | — | — | specified |
-| WP3 | — | — | — | — | — | specified |
-| WP4 | — | — | — | — | — | specified |
-| WP5 | — | — | — | — | — | specified |
-| WP6 | — | — | — | — | — | specified |
+| WP | Shell Syntax | JSON/YAML Validity | Specific Tests | Live/CLI | Overall |
+|----|-------------|-------------------|----------------|----------|---------|
+| WP0 | — | — | — | — | specified |
+| WP1 | — | — | — | — | specified |
+| WP2 | — | — | — | — | specified |
+| WP3 | — | — | — | — | specified |
+| WP4 | — | — | — | — | specified |
+| WP5 | — | — | — | — | specified |
+| WP6 | — | — | — | — | specified |
+| WP7 | — | — | — | — | draft |
+| WP8 | — | — | — | — | draft |

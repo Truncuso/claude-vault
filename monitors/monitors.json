@@ -1,6 +1,6 @@
 {
   "qmd-daemon-health": {
     "command": "while true; do curl -sf localhost:${QMD_DAEMON_PORT:-8181}/health > /dev/null 2>&1; sleep 30; done",
-    "description": "Health-check QMD daemon every 30s. FileChanged hook handles md re-indexing — this monitor is health-only."
+    "description": "Health-check QMD daemon every 30s. FileChanged hook handles .md re-indexing — monitor is health-only."
   }
 }

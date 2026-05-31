@@ -1,11 +1,11 @@
 {
-  "name": "qmd-obsidian",
+  "name": "claude-vault",
   "version": "0.1.0",
-  "description": "QMD semantic search + Obsidian vault management for Claude Code. Multi-vault CRUD via mcpvault, QMD-powered search (BM25 + vector), agentic content ingestion with LangChain/LlamaIndex.",
+  "description": "Vault-centric Claude Code plugin system. Bootstraps Obsidian vaults as self-contained AI knowledge environments with QMD semantic search, mcpvault CRUD, Ollama MCP for local models, ARIS research integration, and configurable note styles per vault type.",
   "author": "Christoph Unger",
   "license": "MIT",
   "dependencies": {
     "qmd": ">=0.9.0"
   },
-  "keywords": ["obsidian", "qmd", "vault", "search", "knowledge-base", "ingestion"]
+  "keywords": ["obsidian", "vault", "qmd", "search", "research", "knowledge-base", "ingestion", "aris", "ollama", "mcpvault"]
 }

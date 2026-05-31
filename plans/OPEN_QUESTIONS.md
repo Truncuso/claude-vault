@@ -1,39 +1,85 @@
-# Open Questions — QMD + Obsidian Vault Integration
+# Open Questions — claude-vault
 
-**Date**: 2026-05-13
-**Updated**: 2026-05-13
+**Date**: 2026-05-14
 
 ---
 
 ## Active Questions
 
-| ID | Question | Context | Blocks | Owner | Status |
-|----|----------|---------|--------|-------|--------|
-| Q1 | Should the obsidian-local-rest-api API key be rotated and stored in a secrets manager instead of config.env? | Current key is in vault `.obsidian/plugins/obsidian-local-rest-api/data.json`. If we use REST API as fallback for mcpvault, key management matters. | WP3 (minor — only if REST API used as fallback) | Christoph | open |
-| Q2 | What is the minimal plugin set for new vault templates? | Baseline proposal: `templater-obsidian` only. Alternatives: also `obsidian-git`, `dataview`, `obsidian-local-rest-api`? | WP4 | Christoph | open |
-| Q3 | Vault naming convention: `Obsidian_<Purpose>_Vault` or `Obsidian_<Purpose>`? | Current: `Obsidian_Work_Vault`. Proposal for new vaults: `Obsidian_Test_Vault`, `Obsidian_Personal_Vault`. Simpler alternative: `Obsidian_Work`, `Obsidian_Test`, `Obsidian_Personal`. | WP4 | Christoph | open |
-| Q4 | Create personal vault (`Obsidian_Personal_Vault`) now or defer? | User mentioned "multiple vaults for multiple purposes" but only explicitly requested the test vault. Personal vault can be created alongside test vault or deferred. | WP4 | Christoph | open |
-| Q5 | Should ingestion CLI include a TypeScript wrapper, or keep Python-only? | Current ingestion is Python-only. User mentioned "python/typescript or combination". A TS wrapper could provide better Claude Code integration (Node.js native) but adds complexity. | WP6 | Christoph | open |
+### Q1: ARIS Skill Scope for Research Vault (WP7)
+
+**Severity:** HIGH | **Blocks:** WP7
+
+Which ARIS skills are truly essential for a research vault? The current estimate is 8 core skills but this needs auditing:
+- Which skills are dependencies of the core set?
+- Which Codex-native skills need Claude Code equivalents?
+- Can unused skills be excluded from installation to reduce clutter?
+
+---
+### Q2: Research Vault Folder Structure (WP7)
+
+**Severity:** MEDIUM | **Blocks:** WP7
+
+Should the research vault use ARIS's `research-wiki/` layout or integrate with the working vault's `000_Projects/` + `Areas/` structure? Mixed approach?
+
+---
+### Q3: Ollama Model Minimum for Reviewer Quality (WP7)
+
+**Severity:** MEDIUM | **Blocks:** WP7 (design)
+
+Which Ollama models provide sufficient reviewer quality for the adversarial review loop?
+- Minimum recommendation: deepseek-v3.2 (~70B params)?
+- Acceptable fallbacks: qwen3.5, gemini-3-pro?
+- Can quantized models work for review tasks?
+
+---
+### Q4: API Key Storage (WP1)
+
+**Severity:** LOW | **Blocks:** — (not blocking, deferred)
+
+Should API keys (Obsidian REST API, OpenAI, Anthropic) live in `.claude/config/config.env` (gitignored) or in a system keyring/secret manager?
+
+---
+### Q5: Obsidian Plugin Auto-Install (WP0 setup skill)
+
+**Severity:** LOW | **Blocks:** — (not blocking)
+
+Can the setup skill auto-install Obsidian community plugins (templater-obsidian, dataview) or must the user install them manually through Obsidian's UI? Affects setup skill flow.
+
+---
+### Q6: Learning Vault — Spaced Repetition Integration (WP8)
+
+**Severity:** LOW | **Blocks:** WP8 (design deferrable)
+
+Should spaced repetition integrate with Anki/AnkiConnect or use custom note metadata + QMD queries?
+
+---
+### Q7: Course Syllabus Parsing (WP8)
+
+**Severity:** LOW | **Blocks:** WP8 (design deferrable)
+
+For learning vaults: auto-parse syllabi from PDF/web or manual entry?
 
 ---
 
-## Resolution Log
+## Resolved Questions
 
-| ID | Question | Resolution | Resolved By | Date |
-|----|----------|------------|-------------|------|
-| Q-ARCH-1 | obsidian-local-rest-api bridge vs mcpvault vs filesystem MCP? | Use mcpvault as primary CRUD (MCP-native, no plugin), Obsidian CLI for live ops, keep REST API as fallback | Christoph | 2026-05-13 |
-| Q-ARCH-2 | smolagents vs LangChain/LlamaIndex for ingestion? | LangChain/LlamaIndex per user's explicit choice | Christoph | 2026-05-13 |
-| Q-ARCH-3 | QMD daemon: systemd vs SessionStart hook? | Both — systemd for persistence, SessionStart hook as fallback | Christoph | 2026-05-13 |
+| Question | Resolution | Date |
+|----------|-----------|------|
+| Global plugin vs per-vault? | Per-vault (`.claude/` inside vault) | 2026-05-14 |
+| Plugin name? | `claude-vault` | 2026-05-14 |
+| Ollama MCP: build or use existing? | Use `rawveg/ollama-mcp` | 2026-05-14 |
+| Old Obsidian_Work_Vault: migrate or keep? | Keep as-is, create new vaults | 2026-05-14 |
+| Repo: rename or delete? | Rename Truncuso/qmd-obsidian → Truncuso/claude-vault | 2026-05-14 |
+| Install method: marketplace or manual? | Both — marketplace for skill loading, setup script for bootstrapping | 2026-05-14 |
+| Smolagents vs LangChain? | LangChain/LlamaIndex (user's explicit choice from original session) | 2026-05-13 |
+| mcpvault vs custom bridge? | mcpvault (MCP-native, zero bridge code) | 2026-05-13 |
+| QMD auto-update: global or per-collection? | Global only (`qmd update`/`qmd embed` have no `--collection` flag) | 2026-05-14 |
 
 ---
 
 ## Escalation Protocol
 
-If any question remains unresolved after 2 rounds of clarification:
-
-1. Halt implementation.
-2. Escalate to Christoph with:
-   - The unresolved question(s)
-   - Impact on dependent WPs
-   - Proposed resolution or decision checkpoint (Option 1 / Option 2)
-3. Do not proceed past Spec until resolved.
+1. If a question blocks a WP for >1 session → escalate to decision with rationale documented
+2. If insufficient information → make documented assumption, mark as `ASSUMPTION:`, revisit
+3. If question resolves during implementation → move to Resolved table

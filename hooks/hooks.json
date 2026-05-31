@@ -1,20 +1,20 @@
 {
   "SessionStart": [
     {
-      "command": "qmd-daemon ensure || true",
+      "command": "bash .claude/scripts/qmd/qmd-daemon.sh ensure || true",
       "timeout": 10000,
-      "description": "Ensure QMD HTTP daemon is running on port ${QMD_DAEMON_PORT}. Non-blocking on failure."
+      "description": "Ensure QMD HTTP daemon is running. Non-blocking on failure."
     },
     {
-      "command": "vault info || true",
-      "timeout": 5000,
-      "description": "Print active vault summary for session context. Non-blocking on failure."
+      "command": "echo '{\"vault\":\"'$(basename \"$VAULT_ROOT\" 2>/dev/null || echo unknown)'\"}' || true",
+      "timeout": 3000,
+      "description": "Echo vault name for session context. Non-blocking."
     }
   ],
   "FileChanged": [
     {
       "pattern": "**/*.md",
-      "command": "qmd update",
+      "command": "cd \"${VAULT_ROOT:-.}\" && qmd update",
       "mode": "async",
       "debounce_ms": 30000,
       "description": "Re-index QMD on markdown file changes (global qmd update)"
@@ -22,9 +22,9 @@
   ],
   "PostCompact": [
     {
-      "command": "qmd-daemon status || true",
+      "command": "bash .claude/scripts/qmd/qmd-daemon.sh status || true",
       "timeout": 5000,
-      "description": "Verify QMD daemon health after context compaction. Non-blocking on failure."
+      "description": "Verify QMD daemon health after context compaction. Non-blocking."
     }
   ],
   "Stop": [

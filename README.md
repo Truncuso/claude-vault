@@ -1,83 +1,59 @@
-# qmd-obsidian — QMD + Obsidian Vault Integration Plugin
+# claude-vault — Vault-Centric Claude Code Plugin
 
-Claude Code plugin integrating QMD semantic search with Obsidian vault management. Portable, env-var-driven, multi-vault.
+Claude Code plugin that transforms Obsidian vaults into self-contained AI-assisted knowledge environments. Each vault gets its own `.claude/` directory with skills, QMD search, mcpvault CRUD, and Ollama MCP for local models — tailored to the vault's purpose.
 
-**Status**: spec complete — implementation pending
+**Status**: architecture complete — implementation pending
+
+## Vault Types
+
+| Type | Purpose | Status |
+|------|---------|--------|
+| **Working Vault** | Daily notes, projects, meetings, general knowledge | WP3-WP5 (pending) |
+| **Research Vault** | Paper wiki, literature survey, adversarial review, paper writing | WP7 (draft) |
+| **Learning Vault** | Courses, books, concept mapping, spaced repetition | WP8 (draft) |
 
 ## Architecture
 
-Three-layer access model:
+Four-layer access model within each vault:
 
-| Layer | Tool | Role | Requires Obsidian Running? |
-|-------|------|------|---------------------------|
-| Search | QMD (MCP) | BM25 + vector search, saves tokens by finding context before loading files | No |
-| CRUD | mcpvault | Read/write/patch/delete notes, frontmatter, tags — 14 tools | No |
-| Live Ops | Obsidian CLI | Template creation, daily notes, UI commands | Yes |
+| Layer | Tool | Requires Obsidian? |
+|-------|------|-------------------|
+| Search | QMD per vault (BM25 + vector) | No |
+| CRUD | mcpvault per vault (14 tools) | No |
+| Live Ops | Obsidian CLI | Yes |
+| Local LLM | rawveg/ollama-mcp (14 tools) | No (Ollama must run) |
 
-## Key Decisions
+## Installation
 
-See `plans/OVERVIEW.md` for full decision log. Summary:
+**Marketplace:** `claude plugins install claude-vault` — loads skills. Interactive setup skill runs on first session.
 
-- **mcpvault over custom bridge**: MCP-native, zero bridge code, works headless
-- **QMD auto-update split**: `qmd update` via inotify (fast file scan), `qmd embed` via manual/cron (expensive ML inference). Both commands are global — no `--collection` flag exists
-- **LangChain/LlamaIndex for ingestion**: User's explicit choice over smolagents
-- **Env-var-based paths**: Zero hardcoded absolute paths, `config/config.env` is single source of workstation-specific config
-- **Multi-vault from start**: Vault registry + creation scripts in WP4
+**Manual:** Clone repo into vault, run `./setup.sh` — self-contained bootstrap.
 
-## Plugin Structure
+## Structure (within a vault)
 
 ```
-qmd-obsidian/
-├── .claude-plugin/plugin.json    # Plugin manifest
-├── hooks/hooks.json              # 5 lifecycle hooks
-├── monitors/monitors.json        # 2 background monitors
-├── settings.json                 # Plugin settings
-├── config/
-│   ├── config.env.example        # Workstation config template (git tracked)
-│   └── vault-registry.json       # Known vaults registry
-├── plans/                        # Full SDD documentation (12 files)
-├── docs/                         # Architecture + setup guides (pending)
-├── bin/                          # CLI executables (pending)
-├── scripts/                      # Shell/Python scripts (pending)
-└── skills/                       # 5 skills (pending)
-```
-
-## Work Packages
-
-| WP | Title | Status |
-|----|-------|--------|
-| WP1 | Foundation — Environment & Path Conventions | specified |
-| WP2 | QMD Configuration — Collections, Indexing, Daemon, Auto-Update | specified |
-| WP3 | Obsidian MCP Access — mcpvault + CLI | specified |
-| WP4 | Multi-Vault Management | specified |
-| WP5 | Skills & Templates | specified |
-| WP6 | Agentic Ingestion — LangChain/LlamaIndex Migration | specified |
-
-## Setup (Post-Implementation)
-
-```bash
-# 1. Install the plugin
-claude plugins install Truncuso/qmd-obsidian
-
-# 2. Copy and edit workstation config
-cp config/config.env.example config/config.env
-$EDITOR config/config.env
-
-# 3. Run QMD setup (manual, one-time)
-bash scripts/qmd/setup-collections.sh
-
-# 4. Start daemon
-systemctl --user enable --now qmd-daemon
+.claude/
+├── CLAUDE.md
+├── settings.json         # MCP configs (QMD, mcpvault, Ollama)
+├── hooks/hooks.json
+├── monitors/monitors.json
+├── skills/
+│   ├── general/          # All vault types (6 skills)
+│   └── <vault-type>/     # Type-specific skills
+├── scripts/
+├── prompts/styles/       # Note style profiles
+└── config/
 ```
 
 ## References
 
-- [QMD](https://github.com/tobi/qmd) — local markdown search engine
+- [QMD](https://github.com/tobi/qmd) — local markdown search engine (by Tobias Lutke)
 - [mcpvault](https://github.com/bitbonsai/mcpvault) — MCP-native vault CRUD
-- [Obsidian CLI](https://obsidian.md/cli) — search, create, daily notes
+- [ollama-mcp](https://github.com/rawveg/ollama-mcp) — Ollama MCP server (14 tools)
+- [ARIS](https://github.com/wanshuiyin/Auto-claude-code-research-in-sleep) — ML research automation (65 skills)
+- [Obsidian CLI](https://obsidian.md/cli) — CLI reference
 - [Claude Code Plugins](https://code.claude.com/docs/en/plugins)
 - [Claude Code Hooks](https://code.claude.com/docs/en/hooks-guide)
-- [Blog: personal OS skills](https://x.com/ArtemXTech/status/2028330693659332615)
 
 ## License
 
